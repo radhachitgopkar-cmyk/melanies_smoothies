@@ -3,7 +3,7 @@ import streamlit as st
 import requests
 from snowflake.snowpark.functions import col
 
-# Get the current credentials
+# Connect to Snowflake
 cnx = st.connection("snowflake")
 session = cnx.session()
 
@@ -19,18 +19,16 @@ name_on_order = st.text_input("Name on Smoothie:")
 
 st.write("The name on your Smoothie will be:", name_on_order)
 
-# Get the fruit options from the Snowflake table
-my_dataframe = session.table("SMOOTHIES.PUBLIC.FRUIT_OPTIONS").select(col("FRUIT_NAME"),col("SEARCH_ON"))
-#st.dataframe(data=my_dataframe, use_container_width=True)
-#st.stop()
+# Get the fruit options and API search values from Snowflake
+my_dataframe = session.table(
+    "SMOOTHIES.PUBLIC.FRUIT_OPTIONS"
+).select(
+    col("FRUIT_NAME"),
+    col("SEARCH_ON")
+)
 
 # Convert the Snowpark DataFrame to a pandas DataFrame
 pd_df = my_dataframe.to_pandas()
-# Display the dataframe so we can verify it
-st.dataframe(pd_df)
-
-# Stop the app here for testing
-st.stop()
 
 # Allow the user to choose up to five ingredients
 ingredients_list = st.multiselect(
@@ -39,52 +37,84 @@ ingredients_list = st.multiselect(
     max_selections=5
 )
 
-# Convert the selected fruits into one text string
+# Create the ingredients string
 ingredients_string = ""
 
-for fruit_chosen in ingredients_list:
-    ingredients_string += fruit_chosen + " "
+# Display nutrition information for each selected fruit
+if ingredients_list:
 
-    search_on=pd_df.loc[pd_df['FRUIT_NAME'] == fruit_chosen, 'SEARCH_ON'].iloc[0]
-    st.write('The search value for ', fruit_chosen,' is ', search_on, '.')
+    for fruit_chosen in ingredients_list:
+        ingredients_string += fruit_chosen + " "
 
-    st.subheader(fruit_chosen + ' Nutrition Information')
+        # Find the corresponding SEARCH_ON value
+        search_on = pd_df.loc[
+            pd_df["FRUIT_NAME"] == fruit_chosen,
+            "SEARCH_ON"
+        ].iloc[0]
 
-    # Call the SmoothieFroot API for the selected fruit
-    smoothiefroot_response = requests.get(
-        f"https://my.smoothiefroot.com/api/fruit/{search_on}")
+        # Display the selected fruit name
+        st.subheader(fruit_chosen + " Nutrition Information")
 
-    # Display the nutrition information
-    sf_df = st.dataframe(
-        data=smoothiefroot_response.json(),
-        use_container_width=True
-    )
+        try:
+            # Call the SmoothieFroot API using SEARCH_ON
+            smoothiefroot_response = requests.get(
+                f"https://my.smoothiefroot.com/api/fruit/{search_on}",
+                timeout=10
+            )
+
+            # Raise an error for unsuccessful responses
+            smoothiefroot_response.raise_for_status()
+
+            # Display the API results
+            st.dataframe(
+                data=smoothiefroot_response.json(),
+                use_container_width=True
+            )
+
+        except requests.exceptions.RequestException:
+            st.error(
+                "Nutrition information could not be found for "
+                + fruit_chosen
+                + "."
+            )
 
 # Submit button
 if st.button("Submit Order"):
 
-    # Escape apostrophes entered by the user
-    safe_ingredients = ingredients_string.replace("'", "''")
-    safe_name = name_on_order.replace("'", "''")
+    if not name_on_order:
+        st.warning("Please enter a name for the smoothie.")
 
-    # Build the INSERT statement
-    sql_insert = (
-        "INSERT INTO SMOOTHIES.PUBLIC.ORDERS "
-        "(INGREDIENTS, NAME_ON_ORDER) "
-        "VALUES ('"
-        + safe_ingredients
-        + "','"
-        + safe_name
-        + "')"
-    )
+    elif not ingredients_list:
+        st.warning("Please choose at least one ingredient.")
 
-    # Run the INSERT statement
-    result = session.sql(sql_insert)
-    result.collect()
+    else:
+        # Escape apostrophes before creating the SQL statement
+        safe_ingredients = ingredients_string.replace("'", "''")
+        safe_name = name_on_order.replace("'", "''")
 
-    # Confirmation message
-    st.success(
-        "✅ Your Smoothie is ordered, "
-        + name_on_order
-        + "!"
-    )
+        # Build the INSERT statement
+        sql_insert = (
+            "INSERT INTO SMOOTHIES.PUBLIC.ORDERS "
+            "(INGREDIENTS, NAME_ON_ORDER) "
+            "VALUES ('"
+            + safe_ingredients
+            + "','"
+            + safe_name
+            + "')"
+        )
+
+        try:
+            # Run the INSERT statement
+            result = session.sql(sql_insert)
+            result.collect()
+
+            # Confirmation message
+            st.success(
+                "✅ Your Smoothie is ordered, "
+                + name_on_order
+                + "!"
+            )
+
+        except Exception as error:
+            st.error("Your smoothie order could not be submitted.")
+            st.exception(error)
