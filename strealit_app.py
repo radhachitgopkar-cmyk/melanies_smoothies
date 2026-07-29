@@ -21,11 +21,16 @@ st.write("The name on your Smoothie will be:", name_on_order)
 
 # Get the fruit options from the Snowflake table
 my_dataframe = session.table("SMOOTHIES.PUBLIC.FRUIT_OPTIONS").select(col("FRUIT_NAME"),col("SEARCH_ON"))
-st.dataframe(data=my_dataframe, use_container_width=True)
-st.stop()
+#st.dataframe(data=my_dataframe, use_container_width=True)
+#st.stop()
 
 # Convert the Snowpark DataFrame to a pandas DataFrame
 pd_df = my_dataframe.to_pandas()
+# Display the dataframe so we can verify it
+st.dataframe(pd_df)
+
+# Stop the app here for testing
+st.stop()
 
 # Allow the user to choose up to five ingredients
 ingredients_list = st.multiselect(
