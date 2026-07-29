@@ -52,8 +52,7 @@ for fruit_chosen in ingredients_list:
 
     # Call the SmoothieFroot API for the selected fruit
     smoothiefroot_response = requests.get(
-        "https://my.smoothiefroot.com/api/fruit/" + fruit_chosen
-    )
+        f"https://my.smoothiefroot.com/api/fruit/{search_on}")
 
     # Display the nutrition information
     sf_df = st.dataframe(
