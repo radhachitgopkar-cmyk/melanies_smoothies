@@ -39,6 +39,7 @@ ingredients_string = ""
 
 for fruit_chosen in ingredients_list:
     ingredients_string += fruit_chosen + " "
+    st.subheader(fruit_chosen + ' Nutrition Information')
 
     # Call the SmoothieFroot API for the selected fruit
     smoothiefroot_response = requests.get(
