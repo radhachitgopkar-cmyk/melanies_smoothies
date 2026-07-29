@@ -60,6 +60,6 @@ if st.button("Submit Order"):
     # Confirmation message
     st.success("✅ Your Smoothie is ordered, " +name_on_order + "!")
 
-   import requests  
+import requests  
 smoothiefroot_response = requests.get("[https://my.smoothiefroot.com/api/fruit/watermelon](https://my.smoothiefroot.com/api/fruit/watermelon)")  
 st.text(smoothiefroot_response)
